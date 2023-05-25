@@ -193,7 +193,10 @@
 
 /* printf, fopen, fread, fclose */
 #include <stdio.h>
+/* exit */
+#include <stdlib.h>
 
+// Number of points to read from the file
 #define N 500
 
 /**
@@ -202,35 +205,34 @@
  * function whose the n values from f(a) to f(b) are in an array. The values from f(a) to f(b)
  * must be from points evenly distributed throughout the x-axis.
  * 
+ * @author Gabriel Luan Alves Valentim
+ * @author André Lucas Mendes Nazareth
+ * 
  * @param   a  The starting point of the integration interval
  * @param   b  The end of the integration interval
  * @param   n  The number of values for f(x)
  * @param   y  The array that holds the n values for f(x)
  * 
- * @return      The approximation of the integral
- * 
- * @author Gabriel Luan Alves Valentim
- * @author André Lucas Mendes Nazareth
+ * @return     The approximation of the integral
  * 
 */
 double trapezoidalRule(const double a, const double b, double const *y, const int n) {
 
-    double total = 0;
-    double dx = (b - a) / (n - 1);
-    int x = n - 2;
+   double total = 0;
+   double dx = (b - a) / (n - 1);
+   int x = n - 2;
 
-    total = y[0] / 2.0 + y[n - 1] / 2.0;
-    while(x > 0) total += (double)y[x--];
-    total *= dx;
+   total = y[0] / 2.0 + y[n - 1] / 2.0;
+   while(x > 0) total += (double)y[x--];
+   total *= dx;
 
-    return total;
+   return total;
 
 }
 
 /**
  * 
- * 
- * Reads from a file the parameters necessary to use the trapezoidalRule function. The file must contain,
+ * Reads from a file the necessary parameters to use the trapezoidalRule function. The file must contain,
  * in the following order, the values of "a" and "b", which delimitate the integration interval, and n
  * values of the function f(x) for the n points evenly distributed through the the x-axis from a to b.
  * All these values must be of the float64 type.
@@ -249,24 +251,45 @@ double trapezoidalRule(const double a, const double b, double const *y, const in
  * 
 */
 void readInput(const char* filename, double *a, double *b, double *array, size_t n) {
-    FILE *file = fopen("input.bin", "r");
+   FILE *file = fopen(filename, "rb");
 
-    fread(a, 1, sizeof(double), file);
-    fread(b, 1, sizeof(double), file);
-    fread(array, n, sizeof(double), file);
+   fread(a, 1, sizeof(double), file);
+   fread(b, 1, sizeof(double), file);
+   fread(array, n, sizeof(double), file);
 
-    fclose(file);
+   fclose(file);
 }
 
+
+/**
+ * 
+ * This application reads a, b and another 500 float64 typed elements
+ * and calculates the integral of a f(x) function, whose values for 500
+ * points evenly distributed on the range [a, b].
+ * 
+ * Receives the name of the file as a CLI parameter
+ * Ex: ./numeric_integration [input_file_name]
+ * 
+*/
 int main(int argc, char** argv) {
-    double a, b, y[N];
-    double estimatedArea = 0;
+   double a, b, y[N];
+   double estimatedArea = 0;
 
-    readInput("input.bin", &a, &b, y, N);
+   if(argc != 2) {
+      printf("Error: expected only one parameter\n");
+      exit(0);
+   }
 
-    estimatedArea = trapezoidalRule(a, b, y, N);
+   const char *filename = argv[1];
 
-    printf("%.8f", estimatedArea);
+   // Read the parameters
+   readInput(filename, &a, &b, y, N);
 
-    return 0;
+   // Calculate the approximation
+   estimatedArea = trapezoidalRule(a, b, y, N);
+
+   // Display the result
+   printf("%.8f", estimatedArea);
+
+   return 0;
 }
