@@ -1,8 +1,0 @@
-[
-{
-  "directory": "C:/Users/Gabriel Luan/Desktop/Projects/numeric_integration/build",
-  "command": "C:/ProgramData/chocolatey/bin/gcc.exe   -g -o CMakeFiles/numeric_integration.dir/main.c.obj -c \"C:/Users/Gabriel Luan/Desktop/Projects/numeric_integration/main.c\"",
-  "file": "C:/Users/Gabriel Luan/Desktop/Projects/numeric_integration/main.c",
-  "output": "CMakeFiles/numeric_integration.dir/main.c.obj"
-}
-]
