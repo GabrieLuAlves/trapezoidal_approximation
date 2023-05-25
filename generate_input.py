@@ -1,5 +1,5 @@
 import numpy as np
-
+from os import path
 
 
 def main():
@@ -8,7 +8,7 @@ def main():
     x = np.linspace(a, b, num=500, dtype=np.float64)
     y = x * x
 
-    with open('input.bin', 'wb') as file:
+    with open(path.join('build', 'input.bin'), 'wb') as file:
         file.write(np.array([a, b], dtype=np.float64))
         file.write(y)
 

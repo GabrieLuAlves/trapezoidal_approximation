@@ -189,33 +189,28 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
-
 */
 
+/* printf, fopen, fread, fclose */
 #include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
+
+#define N 500
 
 /**
  * 
- * The trapezoidalRule function calculates an approximation of the integral of a given
- * function from a to b.
+ * Calculates, by the trapezoidal rule, an approximation of the integral from a to b of a given
+ * function whose the n values from f(a) to f(b) are in an array. The values from f(a) to f(b)
+ * must be from points evenly distributed throughout the x-axis.
  * 
- * The readInput function reads from a file the necessary parameters to call 
- * the trapezoidalRule function
- * 
-*/
-
-/**
- * 
- *  Calculates, by the trapezoidal rule, an approximation of the integral from a to b of a given
- *  function whose the n values from f(a) to f(b) are in an array.
- * 
- * @param   a   The starting point of the integration interval
- * @param   b   The end of the integration interval
- * @param   y   An array with the 500 values from f(a) to f(b)
+ * @param   a  The starting point of the integration interval
+ * @param   b  The end of the integration interval
+ * @param   n  The number of values for f(x)
+ * @param   y  The array that holds the n values for f(x)
  * 
  * @return      The approximation of the integral
+ * 
+ * @author Gabriel Luan Alves Valentim
+ * @author André Lucas Mendes Nazareth
  * 
 */
 double trapezoidalRule(const double a, const double b, double const *y, const int n) {
@@ -234,33 +229,42 @@ double trapezoidalRule(const double a, const double b, double const *y, const in
 
 /**
  * 
- *  Reads all the necessary parameters for the trapezoidalRule function from a file.
  * 
- *  @param  filename    The name of the file where the input data is.
- *  @param  a           Pointer to the variable that holds the "a" value.
- *  @param  b           Pointer to the variable that will store the "b" value.
- *  @param array        A 500 elements array which will store the 500 values from f(a) to f(b).
+ * Reads from a file the parameters necessary to use the trapezoidalRule function. The file must contain,
+ * in the following order, the values of "a" and "b", which delimitate the integration interval, and n
+ * values of the function f(x) for the n points evenly distributed through the the x-axis from a to b.
+ * All these values must be of the float64 type.
+ *
+ * @author Gabriel Luan Alves Valentim
+ * @author André Lucas Mendes Nazareth
+ *  
+ * @param   filename    The name of the file where the input data is.
+ * @param   a           Pointer to the variable that will hold the "a" value.
+ * @param   b           Pointer to the variable that will hold the "b" value.
+ * @param   array       A n-elements long array which will store the values from f(a) to f(b).
+ * @param   n           The ammount of f(x) values to be read.
+ * 
+ * 
+ * @see #trapezoidalRule(const double a, const double b, double const *y, const int n)
  * 
 */
-void readInput(const char* filename, double *a, double *b, double *array) {
+void readInput(const char* filename, double *a, double *b, double *array, size_t n) {
     FILE *file = fopen("input.bin", "r");
 
     fread(a, 1, sizeof(double), file);
     fread(b, 1, sizeof(double), file);
-    fread(array, 500, sizeof(double), file);
+    fread(array, n, sizeof(double), file);
 
     fclose(file);
 }
 
 int main(int argc, char** argv) {
-    double a, b, y[500];
+    double a, b, y[N];
     double estimatedArea = 0;
 
-    readInput("input.bin", &a, &b, y);
+    readInput("input.bin", &a, &b, y, N);
 
-    printf("%f %f\n", a, b);
-
-    estimatedArea = trapezoidalRule(a, b, y, 500);
+    estimatedArea = trapezoidalRule(a, b, y, N);
 
     printf("%.8f", estimatedArea);
 
