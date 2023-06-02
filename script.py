@@ -19,12 +19,38 @@ class Test:
         self.tool_approximation = tool_approximation
     
     def generate_report(self, serial):
-        serial.write(np.array([self.a, self.b], dtype=np.float32))
-        serial.write(self.y)
-        
-        data, = struct.unpack("f", serial.read(4))
+        command = struct.pack("=Bff", 0b11000001, np.float32(self.a), np.float32(self.b))
+        serial.write(command)
+        serial.read()
 
-        return np.array([data, self.exact_result - self.tool_approximation, self.exact_result - data])
+        lines = self.y.reshape((50, 10))
+
+        for line in lines:
+            command = struct.pack("=B10f",
+                0b11000010,
+                line[0],
+                line[1],
+                line[2],
+                line[3],
+                line[4],
+                line[5],
+                line[6],
+                line[7],
+                line[8],
+                line[9]
+            )
+    
+            serial.write(command)
+            serial.read()
+        
+
+        command = struct.pack("B", 0b10000010)
+        serial.write(command)
+        response = serial.read(4)
+        result, = struct.unpack("f", response)
+
+        return (result, self.exact_result - result, self.exact_result - self.tool_approximation)
+
 
 def getArduinoConnection():
     while True:
@@ -93,6 +119,66 @@ def main():
     print(results)
 
     connection.close()
+
+def test():
+    a = 0
+    b = 1
+    x = np.linspace(a, b, num=500, dtype=np.float32)
+    y = x * x
+
+    y = y.reshape((50, 10))
+
+    serial = Serial(port, baudrate)
+    sleep(2)
+
+    command = struct.pack("=Bff", 0b11000001, np.float32(0), np.float32(1))
+
+    print("Setting range...\t\t\t\t", end="")
+    bytes_written   = serial.write(command)
+    response        = serial.read(1)
+    label           = "OK" if response == b"\x01" else "FAILED"
+    print(f"[ {label}, {bytes_written} bytes written ]")
+
+    print("Sending values...")
+    i = 0
+    for line in y:
+        command = struct.pack(
+            "=B10f",
+            0b11000010,
+            line[0],
+            line[1],
+            line[2],
+            line[3],
+            line[4],
+            line[5],
+            line[6],
+            line[7],
+            line[8],
+            line[9]
+        )
+
+        bytes_written   = serial.write(command)
+        response        = serial.read(1)
+        label           = "OK" if response == b"\x0A" else "FAILED"
+        print(f"{i}:\t\t[ {label}, {response}, {bytes_written} bytes written ]")
+
+        i += 1
+    
+    command = struct.pack("B", 0b01000001)
+    print("Getting state...", end="")
+    bytes_written   = serial.write(command)
+    response        = serial.read(1)
+    result, = struct.unpack("B", response)
+    print(f"[ state = {result} ]")
+
+    command = struct.pack("B", 0b10000010)
+    print("Getting result...\t\t\t\t", end="")
+    bytes_written   = serial.write(command)
+    response        = serial.read(4)
+    result, = struct.unpack("f", response)
+    print(f"Response: ", result)
+    
+
 
 if __name__ == "__main__":
     main()
