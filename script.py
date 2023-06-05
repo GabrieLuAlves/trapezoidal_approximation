@@ -1,8 +1,9 @@
 import numpy as np
-from time import sleep, time
-from serial import Serial
 import struct
 
+from time import sleep
+from serial import Serial
+from os import system, remove
 
 port = "/dev/ttyUSB0"
 baudrate = 115200
@@ -19,12 +20,41 @@ class Test:
         self.tool_approximation = tool_approximation
     
     def generate_report(self, serial):
-        serial.write(np.array([self.a, self.b], dtype=np.float32))
-        serial.write(self.y)
         
-        data, = struct.unpack("f", serial.read(4))
+        serial.write("{:.16f}\n".format(self.a).encode("ascii"))
+        #response = serial.readline()
+        serial.write("{:.16f}\n".format(self.b).encode("ascii"))
+        #response = serial.readline()
 
-        return np.array([data, self.exact_result - self.tool_approximation, self.exact_result - data])
+        for number in self.y:
+            serial.write("{:.16f}\n".format(number).encode("ascii"))
+            #response = serial.readline()
+            # print("{:.4f} {}".format(number, response))
+        
+        arduino_result, = struct.unpack("f", serial.read(4))
+
+        with open("input.bin", "wb") as file:
+            file.write(np.array([self.a, self.b], dtype=np.float32))
+            file.write(self.y)
+        
+        system("./main")
+
+        pc_result = 0
+
+        with open("output.bin", "rb") as file:
+            pc_result, = struct.unpack("f", file.read(4))
+
+        remove("input.bin")
+        remove("output.bin")
+
+        return np.array([
+            arduino_result,
+            pc_result,
+            self.exact_result,
+            self.exact_result - arduino_result,
+            self.exact_result - pc_result,
+            self.exact_result - self.tool_approximation
+        ])
 
 def getArduinoConnection():
     while True:
@@ -90,7 +120,9 @@ def main():
     ]
 
     results = np.array([ test.generate_report(serial=connection) for test in tests ])
-    print(results)
+    
+    for [ arduino_result, pc_result, actual_area, arduino_error, pc_error, tool_error ] in results:
+        print("{:+.10e}\t{:+.10e}\t{:+.10e}\t{:+.10e}\t{:+.10e}\t{:+.10e}".format(arduino_result, pc_result, actual_area, arduino_error, pc_error, tool_error))
 
     connection.close()
 

@@ -12,10 +12,10 @@
  *
  */
 
-long double a;
-long double b;
-long double accumulator = 0;
-long double aux;
+float a;
+float b;
+float accumulator = 0;
+float aux;
 uint16_t n = 0;
 
 void setup() { Serial.begin(115200); }
@@ -23,7 +23,7 @@ void setup() { Serial.begin(115200); }
 void loop() {
   while (n < 502) {
     if (Serial.available() > 0) {
-      Serial.readBytes((uint8_t *)&aux, 4);
+      aux = Serial.readStringUntil('\n').toFloat();
 
       if (n == 0) {
         a = aux;
@@ -39,7 +39,7 @@ void loop() {
     }
   }
 
-  long double dx = (b - a) / 499.0;
+  float dx = (b - a) / 499.0;
   accumulator *= dx;
 
   Serial.write((uint8_t *)&accumulator, 4);
