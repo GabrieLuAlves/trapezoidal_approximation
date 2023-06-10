@@ -20,16 +20,12 @@ class Test:
         self.tool_approximation = tool_approximation
     
     def generate_report(self, serial):
+        data = np.concatenate((
+            np.array([self.a, self.b], dtype=np.float32),
+            self.y
+        ))
         
-        serial.write("{:.16f}\n".format(self.a).encode("ascii"))
-        #response = serial.readline()
-        serial.write("{:.16f}\n".format(self.b).encode("ascii"))
-        #response = serial.readline()
-
-        for number in self.y:
-            serial.write("{:.16f}\n".format(number).encode("ascii"))
-            #response = serial.readline()
-            # print("{:.4f} {}".format(number, response))
+        serial.write(data)
         
         arduino_result, = struct.unpack("f", serial.read(4))
 
@@ -50,7 +46,7 @@ class Test:
         return np.array([
             arduino_result,
             pc_result,
-            self.exact_result,
+            self.tool_approximation,
             self.exact_result - arduino_result,
             self.exact_result - pc_result,
             self.exact_result - self.tool_approximation
