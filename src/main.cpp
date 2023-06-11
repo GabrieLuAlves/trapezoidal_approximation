@@ -1,5 +1,11 @@
 #include <Arduino.h>
 
+#define NUMBER_OF_POINTS 513
+#define NUMBER_OF_TRAPEZOIDS 512
+
+#define FIRST_POINT_INDEX 2
+#define LAST_POINT_INDEX NUMBER_OF_POINTS + 1
+
 /**
  *
  * Authors: André Lucas Mendes Nazareth and Gabriel Luan Alves Valentim
@@ -36,6 +42,29 @@ float b;               // The x-value of the end of the integration interval
 float accumulator = 0; // Accumulates the results of the sums
 float aux;             // Temporary storage for the received values
 uint16_t n = 0;        // Used for counting the amount of received values
+
+float divideByPowerOfTwo(float x, uint32_t divider) {
+  union {
+    float number;
+    uint32_t bytes;
+  } float32;
+
+  float32.number = x;
+
+  uint32_t mantissa = float32.bytes & 0x7FFFFF;
+  uint32_t exponent = (float32.bytes >> 23) & 0xFF;
+  uint32_t sign = (float32.bytes >> 31);
+
+  if (exponent != 0) {
+    exponent -= divider;
+  } else if (mantissa != 0) {
+    mantissa >>= divider;
+  }
+
+  float32.bytes = (sign << 31) | (exponent << 23) | mantissa;
+
+  return float32.number;
+}
 
 /**
  *
@@ -111,7 +140,7 @@ void loop() {
    */
 
   /* While not received all the 502 values */
-  while (n < 502) {
+  while (n <= LAST_POINT_INDEX) {
     /* Receive 4 bytes, representing the floating-point value */
     Serial.readBytes((uint8_t *)&aux, 4);
 
@@ -121,9 +150,9 @@ void loop() {
     } else if (n == 1) {
       /* The second value is the "b" value */
       b = aux;
-    } else if (n == 2 || n == 501) {
+    } else if (n == 2 || n == LAST_POINT_INDEX) {
       /* The first and the last y values must be divided by two */
-      accumulator += aux / 2.0;
+      accumulator += divideByPowerOfTwo(aux, 1);
     } else {
       /* All the others don't need such operation */
       accumulator += aux;
@@ -135,7 +164,7 @@ void loop() {
   /* Time for the calculations */
 
   /* calculation of dx */
-  float dx = (b - a) / 499.0;
+  float dx = divideByPowerOfTwo(b - a, 9);
 
   /**
    * By multipling the value of accumulator for dx, it will now hold

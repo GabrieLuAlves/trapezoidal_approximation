@@ -1,61 +1,43 @@
 import numpy as np
 import struct
 
+from abc import ABC
 from time import sleep
 from serial import Serial
+from typing import Tuple, List
 from os import system, remove
 
-port = "/dev/ttyUSB0"
-baudrate = 115200
 
-
-class Test:
-    def __init__(self, x, function, a, b, exact_result, tool_approximation):
-        assert len(x) == 500, "The array must be 500-elements long"
-        
-        self.y = function(x)
-        self.a = a
-        self.b = b
-        self.exact_result = exact_result
-        self.tool_approximation = tool_approximation
+class IArduinoConnection(ABC):
+    def sendArray(self, array: np.ndarray):
+        ...
     
-    def generate_report(self, serial):
-        data = np.concatenate((
-            np.array([self.a, self.b], dtype=np.float32),
-            self.y
-        ))
-        
-        serial.write(data)
-        
-        arduino_result, = struct.unpack("f", serial.read(4))
+    def readFloat(self) -> np.float32:
+        ...
+    
+    def close(self):
+        ...
 
-        with open("input.bin", "wb") as file:
-            file.write(np.array([self.a, self.b], dtype=np.float32))
-            file.write(self.y)
-        
-        system("./main")
+class PySerialArduinoConnection(IArduinoConnection):
+    def __init__(self, serial: Serial):
+        self.serial = serial
 
-        pc_result = 0
+    def sendArray(self, array: np.ndarray):
+        self.serial.write(array)
+    
+    def readFloat(self) -> np.float32:
+        content = self.serial.read(4)
+        value, = struct.unpack("f", content)
 
-        with open("output.bin", "rb") as file:
-            pc_result, = struct.unpack("f", file.read(4))
+        return value
 
-        remove("input.bin")
-        remove("output.bin")
+    def close(self):
+        self.serial.close()
 
-        return np.array([
-            arduino_result,
-            pc_result,
-            self.tool_approximation,
-            self.exact_result - arduino_result,
-            self.exact_result - pc_result,
-            self.exact_result - self.tool_approximation
-        ])
-
-def getArduinoConnection():
+def get_pySerial_connection():
     while True:
         try:
-            serial = Serial(port, baudrate)
+            serial = Serial(baudrate=115200, port="/dev/ttyUSB0")
             print('Arduino conectado')
             break
         except:
@@ -63,62 +45,83 @@ def getArduinoConnection():
     
     sleep(2)
     
-    return serial
+    return PySerialArduinoConnection(serial=serial)
 
 def main():
-    connection = getArduinoConnection()
+    connection: IArduinoConnection = get_pySerial_connection()
 
-    tests = [
-        Test(
-            x=np.linspace(0, 1, num=500, dtype=np.float32),
-            a=0,
-            b=1,
-            function=lambda x: x,
-            exact_result=0.5,
-            tool_approximation=0.4999999999999999
-        ),
-        Test(
-            x=np.linspace(0, 1, num=500, dtype=np.float32),
-            a=0,
-            b=1,
-            function=lambda x: x ** 2,
-            exact_result=0.3333333333333333,
-            tool_approximation=0.3333340026746880
-        ),Test(
-            x=np.linspace(1, 3, num=500, dtype=np.float32),
-            a=1,
-            b=3,
-            function=lambda x: 6 * x ** 2 + 5 * x,
-            exact_result=72.0000000000000000,
-            tool_approximation=72.0000321283850200
-        ),Test(
-            x=np.linspace(1, 10, num=500, dtype=np.float32),
-            a=1,
-            b=10,
-            function=lambda x: np.log(x),
-            exact_result=14.0258509299404568,
-            tool_approximation=14.0258265327417000
-        ),Test(
-            x=np.linspace(0, 6.283185307179586, num=500, dtype=np.float32),
-            a=0,
-            b=6.283185307179586,
-            function=lambda x: np.sin(x),
-            exact_result=0,
-            tool_approximation=3.5941550175457e-16
-        ),Test(
-            x=np.linspace(0, 6.283185307179586, num=500, dtype=np.float32),
-            a=0,
-            b=6.283185307179586,
-            function=lambda x: np.cos(500 * x),
-            exact_result= -0.0000053071700000,
-            tool_approximation=-2.9265103921728e-13
-        ),
+    test_points = 513
+    test_inputs = [
+        [0, 1,                  lambda x: x],
+        [0, 1,                  lambda x: x ** 2],
+        [1, 3,                  lambda x: 6 * x ** 2 + 5 * x],
+        [1, 10,                 lambda x: np.log(x)],
+        [0, 6.283185307179586,  lambda x: np.sin(x)],
+        [0, 6.283185307179586,  lambda x: np.cos(500 * x)],
     ]
 
-    results = np.array([ test.generate_report(serial=connection) for test in tests ])
+    test_exact_outputs = np.array([
+        +00.5,
+        +00.3333333333333333,
+        +72.0000000000000000,
+        +14.0258509299404568,
+        +00,     
+        -0.0000053071700000,
+    ])
+
+    reference_tool_outputs = np.array([
+        +00.4999999999999999,
+        +00.3333340026746880,
+        +72.0000321283850200,
+        +14.0258265327417000,
+        +3.5941550175457e-16,
+        -2.9265103921728e-13
+    ])
+
+    arduino_results = []
+
+    pc_results = []
+
+    for [a, b, function] in test_inputs:
+        x = np.linspace(a, b, num=test_points, dtype=np.float32)
+        f_x = function(x)
+
+        connection.sendArray(np.array([a, b], dtype=np.float32))
+        connection.sendArray(f_x)
+        arduino_result = connection.readFloat()
+
+        with open("input.bin", "wb") as file:
+            file.write(np.array([a, b], dtype=np.float32))
+            file.write(f_x)
+        
+        system("./main")
+
+        with open("output.bin", "rb") as file:
+            content = file.read(4)
+        
+        remove("input.bin")
+        remove("output.bin")
+        
+        pc_result, = struct.unpack("f", content)
+
+        arduino_results.append(arduino_result)
+        pc_results.append(pc_result)
     
-    for [ arduino_result, pc_result, actual_area, arduino_error, pc_error, tool_error ] in results:
-        print("{:+.10e}\t{:+.10e}\t{:+.10e}\t{:+.10e}\t{:+.10e}\t{:+.10e}".format(arduino_result, pc_result, actual_area, arduino_error, pc_error, tool_error))
+
+    output = [
+        arduino_results,
+        pc_results,
+        reference_tool_outputs,
+        arduino_results - test_exact_outputs,
+        pc_results - test_exact_outputs,
+        reference_tool_outputs - test_exact_outputs
+    ]
+
+    output = np.array(output).transpose()
+
+    for line in output:
+        print('\t'.join([ "{:+10e}".format(x) for x in line ]))
+    
 
     connection.close()
 
