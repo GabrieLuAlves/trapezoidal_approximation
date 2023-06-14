@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define N_POINTS    500
+#define N_POINTS    513
 
 float trapezoid_rule(const float a, const float b, float const *y, const int n) {
 
@@ -11,7 +11,7 @@ float trapezoid_rule(const float a, const float b, float const *y, const int n) 
     int x = n - 2;
 
     total = y[0] / 2.0 + y[n - 1] / 2.0;
-    while(x > 0) total += (float)y[x--];
+    while(x > 0) total += y[x--];
     total *= dx;
 
     return total;
@@ -20,14 +20,14 @@ float trapezoid_rule(const float a, const float b, float const *y, const int n) 
 void read(FILE *file, float *a, float *b, float *array, int n) {
     fread(a, 1, sizeof(float), file);
     fread(b, 1, sizeof(float), file);
-    fread(array, 500, sizeof(float), file);
+    fread(array, N_POINTS, sizeof(float), file);
 }
 
 int main(int argc, char** argv) {
     FILE *file;
     char *inputFile = "input.bin";
     char *outputFile = "output.bin";
-    float a, b, y[500], calculatedArea;
+    float a, b, y[N_POINTS], calculatedArea;
 
     file = fopen(inputFile, "rb");
     read(file, &a, &b, y, N_POINTS);

@@ -1,30 +1,53 @@
 import numpy as np
 import struct
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from time import sleep
 from serial import Serial
 from typing import Tuple, List
 from os import system, remove
 
 
-class IArduinoConnection(ABC):
-    def sendArray(self, array: np.ndarray):
+port = "COM11"
+baudrade=115200
+executable=".\main.exe"
+
+class ArduinoConnection(ABC):
+    @abstractmethod
+    def writeArray(self, array: np.ndarray):
+        ...
+
+    @abstractmethod
+    def readline(self) -> str:
         ...
     
+    @abstractmethod
+    def read_uint32_t(self) -> int:
+        ...
+    
+    @abstractmethod
     def readFloat(self) -> np.float32:
         ...
     
+    @abstractmethod
     def close(self):
         ...
 
-class PySerialArduinoConnection(IArduinoConnection):
+class PySerialArduinoConnection(ArduinoConnection):
     def __init__(self, serial: Serial):
         self.serial = serial
 
-    def sendArray(self, array: np.ndarray):
+    def writeArray(self, array: np.ndarray):
         self.serial.write(array)
+
+    def readline(self) -> str:
+        return self.serial.readline().decode("ascii")
     
+    def read_uint32_t(self) -> int:
+        data = self.serial.read(4)
+        data, = struct.unpack("I", data)
+        return data 
+
     def readFloat(self) -> np.float32:
         content = self.serial.read(4)
         value, = struct.unpack("f", content)
@@ -34,10 +57,10 @@ class PySerialArduinoConnection(IArduinoConnection):
     def close(self):
         self.serial.close()
 
-def get_pySerial_connection():
+def get_pySerial_connection() -> ArduinoConnection:
     while True:
         try:
-            serial = Serial(baudrate=115200, port="/dev/ttyUSB0")
+            serial = Serial(baudrate=baudrade, port=port)
             print('Arduino conectado')
             break
         except:
@@ -48,9 +71,9 @@ def get_pySerial_connection():
     return PySerialArduinoConnection(serial=serial)
 
 def main():
-    connection: IArduinoConnection = get_pySerial_connection()
+    connection: ArduinoConnection = get_pySerial_connection()
 
-    test_points = 513
+    test_points = 500
     test_inputs = [
         [0, 1,                  lambda x: x],
         [0, 1,                  lambda x: x ** 2],
@@ -66,7 +89,7 @@ def main():
         +72.0000000000000000,
         +14.0258509299404568,
         +00,     
-        -0.0000053071700000,
+        +00,
     ])
 
     reference_tool_outputs = np.array([
@@ -86,15 +109,19 @@ def main():
         x = np.linspace(a, b, num=test_points, dtype=np.float32)
         f_x = function(x)
 
-        connection.sendArray(np.array([a, b], dtype=np.float32))
-        connection.sendArray(f_x)
+        connection.writeArray(np.array([a, b], dtype=np.float32))
+        connection.writeArray(f_x)
+
         arduino_result = connection.readFloat()
+        elapsed_time = connection.read_uint32_t()
+        
+        print("{:+012.8f}  {:8d}".format(arduino_result, elapsed_time))
 
         with open("input.bin", "wb") as file:
             file.write(np.array([a, b], dtype=np.float32))
             file.write(f_x)
         
-        system("./main")
+        system(executable)
 
         with open("output.bin", "rb") as file:
             content = file.read(4)
@@ -103,25 +130,6 @@ def main():
         remove("output.bin")
         
         pc_result, = struct.unpack("f", content)
-
-        arduino_results.append(arduino_result)
-        pc_results.append(pc_result)
-    
-
-    output = [
-        arduino_results,
-        pc_results,
-        reference_tool_outputs,
-        arduino_results - test_exact_outputs,
-        pc_results - test_exact_outputs,
-        reference_tool_outputs - test_exact_outputs
-    ]
-
-    output = np.array(output).transpose()
-
-    for line in output:
-        print('\t'.join([ "{:+10e}".format(x) for x in line ]))
-    
 
     connection.close()
 

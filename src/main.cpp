@@ -4,7 +4,7 @@
 #define NUMBER_OF_TRAPEZOIDS 512
 
 #define FIRST_POINT_INDEX 2
-#define LAST_POINT_INDEX NUMBER_OF_POINTS + 1
+#define LAST_POINT_INDEX  NUMBER_OF_POINTS + 1
 
 /**
  *
@@ -37,34 +37,6 @@
  *
  */
 
-float a;               // The x-value of the start of the integration interval
-float b;               // The x-value of the end of the integration interval
-float accumulator = 0; // Accumulates the results of the sums
-float aux;             // Temporary storage for the received values
-uint16_t n = 0;        // Used for counting the amount of received values
-
-float divideByPowerOfTwo(float x, uint32_t divider) {
-  union {
-    float number;
-    uint32_t bytes;
-  } float32;
-
-  float32.number = x;
-
-  uint32_t mantissa = float32.bytes & 0x7FFFFF;
-  uint32_t exponent = (float32.bytes >> 23) & 0xFF;
-  uint32_t sign = (float32.bytes >> 31);
-
-  if (exponent != 0) {
-    exponent -= divider;
-  } else if (mantissa != 0) {
-    mantissa >>= divider;
-  }
-
-  float32.bytes = (sign << 31) | (exponent << 23) | mantissa;
-
-  return float32.number;
-}
 
 /**
  *
@@ -75,7 +47,9 @@ float divideByPowerOfTwo(float x, uint32_t divider) {
  * @author André Lucas Mendes Nazareth
  *
  */
-void setup() { Serial.begin(115200); }
+void setup() {
+  Serial.begin(115200);
+}
 
 /**
  *
@@ -139,43 +113,58 @@ void loop() {
    *
    */
 
-  /* While not received all the 502 values */
-  while (n <= LAST_POINT_INDEX) {
-    /* Receive 4 bytes, representing the floating-point value */
+  float aux;              /* Temporary storage for the received values */
+
+  uint32_t elapsedTime = 0;
+  uint32_t t = 0;
+  
+  /* Read a */
+  Serial.readBytes((uint8_t *)&aux, 4);
+  t = micros();
+  float a = aux;
+  elapsedTime += micros() - t;
+
+  /* Read b */
+  Serial.readBytes((uint8_t *)&aux, 4);
+  t = micros();
+  float b = aux;
+  elapsedTime += micros() - t;
+
+  float accumulator = 0;  /* Variable that will accumulate the results of the sums */
+
+  /* Read first Y value */
+  Serial.readBytes((uint8_t *)&aux, 4);
+
+  t = micros();
+  accumulator += aux / 2;
+  elapsedTime += micros() - t;
+
+  /* Read the next n Y values */
+  for (uint16_t i = 0 ; i < 498 ; i++) {
     Serial.readBytes((uint8_t *)&aux, 4);
 
-    if (n == 0) {
-      /* The first value is the "a" value */
-      a = aux;
-    } else if (n == 1) {
-      /* The second value is the "b" value */
-      b = aux;
-    } else if (n == 2 || n == LAST_POINT_INDEX) {
-      /* The first and the last y values must be divided by two */
-      accumulator += divideByPowerOfTwo(aux, 1);
-    } else {
-      /* All the others don't need such operation */
-      accumulator += aux;
-    }
-
-    n++;
+    t = micros();
+    accumulator += aux;
+    elapsedTime += micros() - t;
   }
-  /* End of the loop. This means all the variables were received. */
-  /* Time for the calculations */
 
-  /* calculation of dx */
-  float dx = divideByPowerOfTwo(b - a, 9);
+  /* Read the last Y value */
+  Serial.readBytes((uint8_t *)&aux, 4);
 
-  /**
-   * By multipling the value of accumulator for dx, it will now hold
-   * the result for our calculation.
-   */
-  accumulator *= dx;
+  t = micros();
+
+  accumulator += aux / 2;
+  float result = accumulator * (b - a) / 499;
+
+  elapsedTime += micros() - t;
 
   /* Sending the floating-point in four bytes */
-  Serial.write((uint8_t *)&accumulator, 4);
+  Serial.write((uint8_t *)&result, 4);
+
+  /* Sending the elapsed time in four bytes */
+  Serial.write((uint8_t *)&elapsedTime, 4);
 
   /* Reset */
   accumulator = 0;
-  n = 0;
+  elapsedTime = 0;
 } /* end of iteration, and then repeat */
